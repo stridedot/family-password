@@ -39,7 +39,7 @@ func Load() *Config {
 
 	return &Config{
 		Port:           getEnv("PORT", "8080"),
-		DBUrl:          getEnv("DATABASE_URL", ""),
+		DBUrl:          getEnv("DATABASE_URL_POOLED", ""),
 		DefaultSilence: time.Duration(silenceDays) * 24 * time.Hour,
 		DefaultGrace:   time.Duration(graceHours) * time.Hour,
 		CronSpec:       getEnv("CRON_SPEC", "0 0 * * * *"),

@@ -32,15 +32,12 @@ func StartCron(svc *service.VaultService, cfg *config.Config) *cron.Cron {
 		log.Printf("[cron] tick — 扫描 %d 个保险库", len(vaults))
 		now := time.Now().UnixMilli()
 		lead := cfg.ReminderLead.Milliseconds()
-		base := cfg.BaseURL
-		if base == "" {
-			base = "http://localhost:" + cfg.Port
-		}
-		// 受益人取用链接指向前端应用（而非后端 API）；缺省回退 base。
+		base := cfg.BaseURL + ":" + cfg.Port
+		
+		// 受益人取用链接指向前端应用（index.html 的 ?id= 深链），不是后端 API。
+		// 后端没有 / 路由也不托管静态页，故 APP_URL 未配置时不能回退到 base（会 404 死链）。
+		// released 分支里对此做了"跳过 + 告警"。
 		appURL := cfg.AppURL
-		if appURL == "" {
-			appURL = base
-		}
 
 		for i := range vaults {
 			v := &vaults[i]
@@ -85,19 +82,24 @@ func StartCron(svc *service.VaultService, cfg *config.Config) *cron.Cron {
 							log.Printf("[cron] mail error: %v", mailErr)
 						}
 					}
-					// 通知受益人：释放即自动发（仅此一次，released 为终态，Evaluate 不再变化）
+					// 通知受益人：释放即自动发（仅此一次，released 为终态，Evaluate 不再变化）。
+					// APP_URL 未配置时拿不到可用的取用链接 → 跳过并发告警，避免发出 404 死链。
 					if v.BeneficiaryEmail != "" {
-						benLink := fmt.Sprintf("%s/?id=%s", strings.TrimRight(appURL, "/"), v.ID)
-						body := fmt.Sprintf("有人为你预留了一份「家庭密码」保险库，现已释放可供取用。\n打开下面的链接，输入当时留给你的释放密码即可查看内容：\n%s", benLink)
-						if mailErr := sender.Send(v.BeneficiaryEmail, "家庭密码：一份留给你的保险库已可用", body); mailErr != nil {
-							log.Printf("[cron] mail error (beneficiary): %v", mailErr)
+						if appURL == "" {
+							log.Printf("[cron] APP_URL 未配置，跳过受益人 %s 的释放通知（无法生成取用链接）", v.BeneficiaryEmail)
 						} else {
-							log.Printf("[cron] 已向受益人 %s 发送释放通知", v.BeneficiaryEmail)
+							benLink := fmt.Sprintf("%s/?id=%s", strings.TrimRight(appURL, "/"), v.ID)
+							body := fmt.Sprintf("有人为你预留了一份「家庭密码」保险库，现已释放可供取用。\n打开下面的链接，输入当时留给你的释放密码即可查看内容：\n%s", benLink)
+							if mailErr := sender.Send(v.BeneficiaryEmail, "家庭密码：一份留给你的保险库已可用", body); mailErr != nil {
+								log.Printf("[cron] mail error (beneficiary): %v", mailErr)
+							} else {
+								log.Printf("[cron] 已向受益人 %s 发送释放通知", v.BeneficiaryEmail)
+							}
 						}
 					}
 				}
 			}
-			
+
 			// 3) 宽限期内最终提醒：释放前 lead 天再催一次
 			if v.TriggerStatus == "grace" && v.Email != "" && !v.GraceReminderSent && now >= v.GraceEndsAt-lead {
 				link := fmt.Sprintf("%s/confirm/%s", base, v.ID)
