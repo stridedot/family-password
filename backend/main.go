@@ -25,10 +25,13 @@ func main() {
 		defer c.Stop()
 	}
 
-	r := router.New(svc)
+	r := router.New(svc, cfg)
 	baseURL := cfg.BaseURL
 	addr := ":" + cfg.Port
-	log.Printf("家庭密码 后端 → %s%s", baseURL, addr)
+	if baseURL == "" {
+		baseURL = "http://localhost" + addr
+	}
+	log.Printf("家庭密码 后端 → %s", baseURL)
 	log.Printf("默认静默=%.0f天，反悔窗口=%.0f小时；cron=%s", cfg.DefaultSilence.Hours()/24, cfg.DefaultGrace.Hours(), cfg.CronSpec)
 	log.Fatal(r.Run(addr))
 }

@@ -32,8 +32,13 @@ func StartCron(svc *service.VaultService, cfg *config.Config) *cron.Cron {
 		log.Printf("[cron] tick — 扫描 %d 个保险库", len(vaults))
 		now := time.Now().UnixMilli()
 		lead := cfg.ReminderLead.Milliseconds()
-		base := cfg.BaseURL + ":" + cfg.Port
-		
+		// BASE_URL 应为"完整公网地址"（如 https://family-password.onrender.com，含 scheme，可含端口）。
+		// 不能无条件拼 :Port：Render 等平台对外只暴露 443，内部 PORT 是别的值，拼了反而坏链。
+		base := cfg.BaseURL
+		if base == "" {
+			base = "http://localhost:" + cfg.Port
+		}
+
 		// 受益人取用链接指向前端应用（index.html 的 ?id= 深链），不是后端 API。
 		// 后端没有 / 路由也不托管静态页，故 APP_URL 未配置时不能回退到 base（会 404 死链）。
 		// released 分支里对此做了"跳过 + 告警"。

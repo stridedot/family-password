@@ -1,7 +1,11 @@
 // 后端 API 封装（纯逻辑，无 DOM）
-// API_BASE 读取优先级：URL ?api= 参数 > 默认值。一份代码适配本地 / 线上 / 测试。
+// API_BASE 读取优先级：URL ?api= 参数 > 默认值（生产后端地址）。
+// 本地调试：在地址栏加 ?api=http://localhost:8080 即可切到本地后端。
+// 说明：这里不用 import.meta.env（Vite 专属），因为前端是纯静态部署，浏览器里 import.meta.env 是 undefined。
 const params = new URLSearchParams(location.search);
-export const API_BASE = (params.get('api') || 'http://localhost:8080').replace(/\/+$/, '');
+export const API_BASE = (
+  params.get('api') || 'https://family-password.onrender.com'
+).replace(/\/+$/, '');
 
 // POST /api/vault —— 创建或更新保险库（密文上送服务端）
 // email / beneficiary_email 为可选通知邮箱，仅非空时发送（更新时留空不会清空服务端已有邮箱）

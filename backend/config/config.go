@@ -28,6 +28,10 @@ type Config struct {
 	SMTPPass     string
 	FromAddr     string
 	FromName     string
+
+	// CORS：允许跨域来源。默认 *（任何来源，本地开发方便）；
+	// 生产建议填前端域名（如 https://family-password.vercel.app），限制其他网站调用后端。
+	AllowOrigin string
 }
 
 func Load() *Config {
@@ -53,6 +57,7 @@ func Load() *Config {
 		SMTPPass:     getEnv("SMTP_PASS", ""),
 		FromAddr:     getEnv("MAIL_FROM", ""),
 		FromName:     getEnv("MAIL_FROM_NAME", "家庭密码"),
+		AllowOrigin:  getEnv("ALLOW_ORIGIN", "*"),
 	}
 }
 
