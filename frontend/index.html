@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>家庭密码 · 文档继承保险库</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <header class="top">
+    <h1>家庭密码</h1>
+    <p class="tagline">生前只有你解开，身后家人按步骤可取。<br>服务器永远只见密文，密码与密钥都在你本地。</p>
+  </header>
+
+  <!-- 屏 1：创建 / 打开保险库 -->
+  <section id="screen-setup" class="screen">
+    <h2 class="screen-title">创建保险库</h2>
+    <p class="screen-desc">设两个密码：一个你自己解锁用，一个留给家人取用。</p>
+
+    <div class="field">
+      <label for="master-pwd">主密码（你自己解锁用）</label>
+      <input type="password" id="master-pwd" placeholder="设一个强密码" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="release-pwd">释放密码（留给受益人）</label>
+      <input type="password" id="release-pwd" placeholder="给家人留的钥匙" autocomplete="off" />
+    </div>
+    <div class="field-reminder">
+      <div class="reminder-title">通知邮箱（可选 · 只用于邮件提醒）</div>
+      <div class="field">
+        <label for="owner-email">你的邮箱 · 逾期前提醒你确认</label>
+        <input type="email" id="owner-email" placeholder="you@example.com" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="ben-email">受益人邮箱 · 释放时自动通知TA</label>
+        <input type="email" id="ben-email" placeholder="family@example.com" autocomplete="off" />
+      </div>
+      <span class="field-hint">邮箱只用于通知，服务器不存内容；留空则不提醒。</span>
+    </div>
+    <div class="field">
+      <label for="vault-id">保险库 ID（可选）</label>
+      <input type="text" id="vault-id" placeholder="已有保险库、换设备打开时填；留空则新建" autocomplete="off" />
+    </div>
+
+    <button id="btn-create" class="primary block">创建 / 打开保险库</button>
+    <p class="warn-text">务必保管好保险库 ID——它相当于账号，丢了无法找回。</p>
+
+    <hr class="sep" />
+    <div class="ben-entry">
+      <span>你是受益人，要来取用家人的保险库？</span>
+      <button id="btn-ben-enter" class="ghost">去取用 →</button>
+    </div>
+  </section>
+
+  <!-- 屏 2：我的保险库（主人视图） -->
+  <section id="screen-vault" class="screen hidden">
+    <div class="bar">
+      <span class="badge owner">主人视图</span>
+      <button id="btn-lock" class="ghost sm">锁定</button>
+    </div>
+
+    <div class="card">
+      <div class="hb-row">
+        <div>
+          <div class="muted sm">上次存活报到</div>
+          <div id="hb-time" class="hb-time">—</div>
+        </div>
+        <button id="btn-alive" class="primary">我还在（报到）</button>
+      </div>
+      <div class="share-row">
+        <span class="muted sm">保险库 ID</span>
+        <code id="vault-id-disp" class="mono">—</code>
+        <button id="btn-copy-link" class="ghost sm">复制取用链接</button>
+      </div>
+    </div>
+
+    <div id="released-banner" class="banner released hidden">
+      <div class="banner-title">保险库已释放</div>
+      <div class="banner-body">受益人现在可以取走内容。已释放后不能再修改，可重新创建。</div>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title">存入一条</h3>
+      <div class="field">
+        <input type="text" id="entry-title" placeholder="标题，如：微信账号 / 房产证" />
+      </div>
+      <div class="field">
+        <textarea id="entry-body" placeholder="内容，如账号密码、关键说明"></textarea>
+      </div>
+      <button id="btn-add" class="primary block">加密存入</button>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title">保险库内容</h3>
+      <ul id="entry-list" class="entries"></ul>
+      <div id="entry-empty" class="empty">
+        <div class="empty-emoji">🔒</div>
+        <div>还没有内容。上面存一条，加密后上传到服务端。</div>
+      </div>
+    </div>
+
+    <details class="how">
+      <summary>关于死亡开关</summary>
+      <p>静默阈值与宽限期由后端配置（SILENCE_DAYS / GRACE_HOURS）。你点"我还在"即向服务端报到；超过阈值且宽限期结束，服务端自动释放。</p>
+    </details>
+  </section>
+
+  <!-- 屏 3：释放模式（受益人视图） -->
+  <section id="screen-release" class="screen hidden">
+    <div class="bar">
+      <span class="badge release">受益人视图</span>
+    </div>
+
+    <div id="release-status" class="status-box" hidden></div>
+
+    <div class="card">
+      <div class="field">
+        <label for="ben-id">保险库 ID</label>
+        <input type="text" id="ben-id" placeholder="家人通过取用链接发你的" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="ben-pwd">释放密码</label>
+        <input type="password" id="ben-pwd" placeholder="家人留给你的钥匙" autocomplete="off" />
+      </div>
+      <button id="btn-release" class="primary block">查询并解密取走</button>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title">取到的内容</h3>
+      <ul id="release-list" class="entries"></ul>
+    </div>
+  </section>
+
+  <!-- Toast 容器 -->
+  <div id="toast-root" class="toast-root"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+
+</html>
