@@ -1,6 +1,9 @@
 package router
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/stridedot/family-password-vault/backend/api"
 	"github.com/stridedot/family-password-vault/backend/config"
@@ -11,7 +14,9 @@ import (
 // allowOrigin 来自配置 ALLOW_ORIGIN：
 //   - "*"     → 放行任意来源（默认，适合本地开发 / 多预览域名）
 //   - 指定域名  → 仅放行该来源（生产推荐），不匹配则不设 Allow-Origin，浏览器会拦截
+// 浏览器 Origin 头从不带尾斜杠，这里对配置 TrimRight 归一化，避免配成 "xxx.com/" 时误拦前端。
 func cors(allowOrigin string) gin.HandlerFunc {
+	allowOrigin = strings.TrimSpace(strings.TrimRight(allowOrigin, "/"))
 	return func(c *gin.Context) {
 		if allowOrigin == "" || allowOrigin == "*" {
 			c.Header("Access-Control-Allow-Origin", "*")
@@ -38,14 +43,19 @@ func New(svc *service.VaultService, cfg *config.Config) *gin.Engine {
 	r.Use(cors(cfg.AllowOrigin))
 	h := api.NewHandler(svc)
 
+	// 保活/健康检查：让 Render 免费实例不被休眠，cron 才能持续跑
+	r.GET("/healthz", func(c *gin.Context) {
+		c.String(http.StatusOK, "ok")
+	})
+	r.HEAD("/healthz", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
 	r.POST("/api/vault", h.CreateOrUpdate)          // 创建 / 更新保险库
 	r.POST("/api/vault/:id", h.Get)                 // 查询保险库（含密文）
 	r.POST("/api/vault/:id/heartbeat", h.Heartbeat) // 主人报到
 	r.POST("/api/vault/:id/trigger", h.Trigger)     // 查询触发状态并实时推进
 	r.GET("/confirm/:id", h.ConfirmPage)            // 邮件确认存活落地页（人类页面）
-	r.GET("/healthz", func(c *gin.Context) { // 保活/健康检查：让 Render 免费实例不被休眠，cron 才能持续跑
-		c.JSON(200, gin.H{"status": "ok"})
-	})
 
 	return r
 }
