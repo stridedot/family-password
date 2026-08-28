@@ -40,6 +40,7 @@ func cors(allowOrigin string) gin.HandlerFunc {
 // GET /confirm/:id 是给人类点的邮件落地页（非 API），点按钮才 POST 心跳。
 func New(svc *service.VaultService, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
+	_ = r.SetTrustedProxies(nil) // 禁用代理信任，消除 "trusted all proxies" 启动警告
 	r.Use(cors(cfg.AllowOrigin))
 	h := api.NewHandler(svc)
 

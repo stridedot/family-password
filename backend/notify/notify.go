@@ -38,7 +38,7 @@ func (s *SMTPSender) Send(to, subject, body string) error {
 	return smtp.SendMail(addr, auth, s.FromAddr, []string{to}, msg)
 }
 
-// buildMime 拼一封最简 text/plain(UTF-8) 邮件
+// buildMime 拼一封 HTML(UTF-8) 邮件。body 支持 HTML 标签；纯文本需调用方自行转 <br>。
 func buildMime(fromAddr, fromName, to, subject, body string) []byte {
 	var b strings.Builder
 	if fromName != "" {
@@ -49,9 +49,13 @@ func buildMime(fromAddr, fromName, to, subject, body string) []byte {
 	_, _ = fmt.Fprintf(&b, "To: %s\r\n", to)
 	_, _ = fmt.Fprintf(&b, "Subject: %s\r\n", subject)
 	_, _ = fmt.Fprintf(&b, "MIME-Version: 1.0\r\n")
-	_, _ = fmt.Fprintf(&b, "Content-Type: text/plain; charset=UTF-8\r\n")
+	_, _ = fmt.Fprintf(&b, "Content-Type: text/html; charset=UTF-8\r\n")
 	_, _ = fmt.Fprintf(&b, "\r\n")
+	b.WriteString("<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\"><title>")
+	b.WriteString(subject)
+	b.WriteString("</title><style>body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#222;max-width:560px;margin:24px auto;padding:0 16px}a{color:#0b5cff;text-decoration:none;border-bottom:1px solid #0b5cff}.box{background:#f6f8fb;border-radius:12px;padding:20px;margin:20px 0}.footer{margin-top:28px;font-size:12px;color:#888}</style></head><body>")
 	b.WriteString(body)
+	b.WriteString("<div class=\"footer\">本邮件由 家庭密码 自动发送，请勿直接回复。</div></body></html>")
 	return []byte(b.String())
 }
 

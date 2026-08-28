@@ -82,22 +82,36 @@ func getEnvInt(k string, def int) int {
 	return n
 }
 
-// loadDotEnv 用 godotenv 解析当前目录的 .env 并注入环境变量。
-// 先去除 UTF-8 BOM（Windows 编辑器常见）；缺失 .env 时静默跳过。
-// 已存在的环境变量不会被覆盖（.env 仅作默认值来源）。
+// loadDotEnv 用 godotenv 解析环境文件并注入环境变量。
+// 支持多环境：APP_ENV=production 时优先读 .env.production，否则读 .env。
+// 顺序：更具体的环境文件优先；已有环境变量（如 Render dashboard 注入的）永远优先，文件不覆盖。
+// 先去除 UTF-8 BOM（Windows 编辑器常见）；文件缺失时静默跳过。
+//
+// 用法：
+//   - 本地开发：go run main.go（读 .env，连本地库）
+//   - 本地模拟生产：APP_ENV=production go run main.go（读 .env.production，连生产库）
+//   - 线上 Render：不打包 .env 文件，直接用 dashboard 环境变量，本函数无副作用
 func loadDotEnv() {
-	data, err := os.ReadFile(".env")
-	if err != nil {
-		return
+	candidates := []string{}
+	if env := os.Getenv("APP_ENV"); env != "" {
+		candidates = append(candidates, ".env."+env)
 	}
-	data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
-	env, err := godotenv.Unmarshal(string(data))
-	if err != nil {
-		return
-	}
-	for k, v := range env {
-		if os.Getenv(k) == "" {
-			_ = os.Setenv(k, v)
+	candidates = append(candidates, ".env")
+
+	for _, f := range candidates {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
+		parsed, err := godotenv.Unmarshal(string(data))
+		if err != nil {
+			continue
+		}
+		for k, v := range parsed {
+			if os.Getenv(k) == "" {
+				_ = os.Setenv(k, v)
+			}
 		}
 	}
 }

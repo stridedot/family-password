@@ -53,7 +53,7 @@ func StartCron(svc *service.VaultService, cfg *config.Config) *cron.Cron {
 				if remaining > 0 && remaining <= lead {
 					link := fmt.Sprintf("%s/confirm/%s", base, v.ID)
 					days := v.SilenceMS / 86_400_000
-					body := fmt.Sprintf("你的家庭密码保险库已 %d 天未报到。\n若你一切安好，请点击下面的链接确认存活，避免被误释放：\n%s", days, link)
+					body := fmt.Sprintf("<p>你的家庭密码保险库已 <strong>%d 天</strong> 未报到。</p><p>若你一切安好，请点击下面的链接确认存活，避免被误释放：</p><p><a href=\"%s\">%s</a></p>", days, link, link)
 					if mailErr := sender.Send(v.Email, "家庭密码：请确认你还活着", body); mailErr != nil {
 						log.Printf("[cron] mail error: %v", mailErr)
 					} else {
@@ -75,33 +75,36 @@ func StartCron(svc *service.VaultService, cfg *config.Config) *cron.Cron {
 					// 进入宽限期：最后通牒，点击链接可取消释放
 					if v.Email != "" {
 						link := fmt.Sprintf("%s/confirm/%s", base, v.ID)
-						body := fmt.Sprintf("你的家庭密码保险库即将释放（宽限期结束即不可逆）。\n若你一切安好，立即点击下面的链接取消释放：\n%s", link)
+						body := fmt.Sprintf("<p>你的家庭密码保险库即将释放（宽限期结束即不可逆）。</p><p>若你一切安好，立即点击下面的链接取消释放：</p><p><a href=\"%s\">%s</a></p>", link, link)
 						if mailErr := sender.Send(v.Email, "家庭密码：保险库即将释放", body); mailErr != nil {
 							log.Printf("[cron] mail error: %v", mailErr)
 						}
 					}
-				case "released":
-					if v.Email != "" {
-						body := "你的家庭密码保险库已释放，受益人现在可以取走内容。"
-						if mailErr := sender.Send(v.Email, "家庭密码：保险库已释放", body); mailErr != nil {
-							log.Printf("[cron] mail error: %v", mailErr)
-						}
+			case "released":
+				// Evaluate 保证 released 只由 grace→released 的 transition 触发一次，故此处不会每轮重发。
+				if v.Email != "" {
+					body := "<p>你的家庭密码保险库已释放，受益人现在可以取走内容。</p>"
+					if mailErr := sender.Send(v.Email, "家庭密码：保险库已释放", body); mailErr != nil {
+						log.Printf("[cron] mail error: %v", mailErr)
+					} else {
+						log.Printf("[cron] 已向主人 %s 发送释放通知", v.Email)
 					}
-					// 通知受益人：释放即自动发（仅此一次，released 为终态，Evaluate 不再变化）。
-					// APP_URL 未配置时拿不到可用的取用链接 → 跳过并发告警，避免发出 404 死链。
-					if v.BeneficiaryEmail != "" {
-						if appURL == "" {
-							log.Printf("[cron] APP_URL 未配置，跳过受益人 %s 的释放通知（无法生成取用链接）", v.BeneficiaryEmail)
+				}
+				// 通知受益人：释放即自动发（仅此一次，由上面的 transition 保证）。
+				// APP_URL 未配置时拿不到可用的取用链接 → 跳过并发告警，避免发出 404 死链。
+				if v.BeneficiaryEmail != "" {
+					if appURL == "" {
+						log.Printf("[cron] APP_URL 未配置，跳过受益人 %s 的释放通知（无法生成取用链接）", v.BeneficiaryEmail)
+					} else {
+						benLink := fmt.Sprintf("%s/?id=%s", strings.TrimRight(appURL, "/"), v.ID)
+						body := fmt.Sprintf("<p>有人为你预留了一份「家庭密码」保险库，现已释放可供取用。</p><p>打开下面的链接，输入当时留给你的释放密码即可查看内容：</p><p><a href=\"%s\">%s</a></p>", benLink, benLink)
+						if mailErr := sender.Send(v.BeneficiaryEmail, "家庭密码：一份留给你的保险库已可用", body); mailErr != nil {
+							log.Printf("[cron] mail error (beneficiary): %v", mailErr)
 						} else {
-							benLink := fmt.Sprintf("%s/?id=%s", strings.TrimRight(appURL, "/"), v.ID)
-							body := fmt.Sprintf("有人为你预留了一份「家庭密码」保险库，现已释放可供取用。\n打开下面的链接，输入当时留给你的释放密码即可查看内容：\n%s", benLink)
-							if mailErr := sender.Send(v.BeneficiaryEmail, "家庭密码：一份留给你的保险库已可用", body); mailErr != nil {
-								log.Printf("[cron] mail error (beneficiary): %v", mailErr)
-							} else {
-								log.Printf("[cron] 已向受益人 %s 发送释放通知", v.BeneficiaryEmail)
-							}
+							log.Printf("[cron] 已向受益人 %s 发送释放通知", v.BeneficiaryEmail)
 						}
 					}
+				}
 				}
 			}
 
@@ -109,7 +112,7 @@ func StartCron(svc *service.VaultService, cfg *config.Config) *cron.Cron {
 			if v.TriggerStatus == "grace" && v.Email != "" && !v.GraceReminderSent && now >= v.GraceEndsAt-lead {
 				link := fmt.Sprintf("%s/confirm/%s", base, v.ID)
 				leftDays := (v.GraceEndsAt - now) / 86_400_000
-				body := fmt.Sprintf("最后一次提醒：你的家庭密码保险库将在约 %d 天后释放。\n若你一切安好，立即点击下面的链接取消释放：\n%s", leftDays, link)
+				body := fmt.Sprintf("<p>最后一次提醒：你的家庭密码保险库将在约 <strong>%d 天</strong> 后释放。</p><p>若你一切安好，立即点击下面的链接取消释放：</p><p><a href=\"%s\">%s</a></p>", leftDays, link, link)
 				if mailErr := sender.Send(v.Email, "家庭密码：释放倒计时，最后确认", body); mailErr != nil {
 					log.Printf("[cron] mail error: %v", mailErr)
 				} else {

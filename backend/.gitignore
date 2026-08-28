@@ -19,3 +19,4 @@ vendor/
 
 # 本地环境变量（含真实密钥，不进仓库；用 .env.example 作模板）
 .env
+.env.*
